@@ -1,0 +1,8 @@
+{
+  "OutputFoldersPerTargetSystem": {
+    "Local Machine": [
+      "FEM-ML\\out\\build\\x64-Debug",
+      "FEM-ML\\out\\install\\x64-Debug"
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+# FEM-ML configuration file
+# Simple cube under tension
+
+# Mesh file
+mesh ../examples/simple_cube/cube.inp
+
+# Material (aluminum)
+material aluminum
+E 70e9
+nu 0.33
+rho 2700
+
+# Time integration
+dt 5e-8
+steps 2000
+auto_timestep true
+damping 0.0
+
+# Output
+output_interval 50
+output results.csv
+
+# Boundary conditions (fix bottom nodes)
+fixed 1 2 5 6
+
+# Loads (pull top in Y direction)
+force 3 1 5e5
+force 4 1 5e5
+force 7 1 5e5
+force 8 1 5e5

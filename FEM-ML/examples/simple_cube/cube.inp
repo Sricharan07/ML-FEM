@@ -1,0 +1,20 @@
+*Heading
+Simple cube mesh for testing
+*Node
+1, 0.0, 0.0, 0.0
+2, 1.0, 0.0, 0.0
+3, 1.0, 1.0, 0.0
+4, 0.0, 1.0, 0.0
+5, 0.0, 0.0, 1.0
+6, 1.0, 0.0, 1.0
+7, 1.0, 1.0, 1.0
+8, 0.0, 1.0, 1.0
+*Element, type=C3D8
+1, 1, 2, 3, 4, 5, 6, 7, 8
+*Nset, nset=BOTTOM
+1, 2, 5, 6
+*Nset, nset=TOP
+3, 4, 7, 8
+*Elset, elset=ALL
+1
+*End
