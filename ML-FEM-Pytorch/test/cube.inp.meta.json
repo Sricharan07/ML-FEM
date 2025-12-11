@@ -1,0 +1,35 @@
+{
+  "material": {
+    "name": "Demo-Aluminum",
+    "type": "linear",
+    "E": 70000000000.0,
+    "nu": 0.32,
+    "rho": 2700.0
+  },
+  "boundary_conditions": [
+    {
+      "name": "Clamp-Left",
+      "type": "fixed",
+      "component": -1,
+      "value": 0.0,
+      "ramp_time": 0.0,
+      "nodes": [1, 4, 7, 10, 13, 16, 19, 22, 25]
+    },
+    {
+      "name": "Disp-Right-X",
+      "type": "displacement",
+      "component": 0,
+      "value": 0.00075,
+      "ramp_time": 0.003,
+      "nodes": [3, 6, 9, 12, 15, 18, 21, 24, 27]
+    }
+  ],
+  "solver_params": {
+    "auto_dt": true,
+    "dt": 5e-06,
+    "steps": 1000,
+    "damping": 0.0,
+    "output_interval": 20,
+    "total_time": 0.003
+  }
+}

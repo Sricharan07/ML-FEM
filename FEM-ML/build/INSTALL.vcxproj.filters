@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\Research-work\ML-FEM\FEM-ML\build\CMakeFiles\912e7d1a75f115b4a956e59543216069\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{C9149D00-6918-34A1-BA9D-001EAB2D11B4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

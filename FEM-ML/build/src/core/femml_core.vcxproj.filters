@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\mesh\Mesh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\mesh\AbaqusImporter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\element\HexElement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\element\TetElement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\material\LinearElastic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\material\NeuralMaterial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\solver\ExplicitSolver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\integration\CentralDifference.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Research-work\ML-FEM\FEM-ML\src\core\io\ResultsWriter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\mesh\Mesh.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\mesh\AbaqusImporter.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\element\Element.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\element\HexElement.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\element\TetElement.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\material\Material.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\material\LinearElastic.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\material\NeuralMaterial.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\solver\ExplicitSolver.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\integration\TimeIntegrator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\integration\CentralDifference.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Research-work\ML-FEM\FEM-ML\include\io\ResultsWriter.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\Research-work\ML-FEM\FEM-ML\src\core\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{C4C3FC5C-06DB-38D7-AE87-AF79C5865268}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{71AEA9F4-EF18-31B2-B270-57EC34C56598}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -98,7 +98,8 @@ PYBIND11_MODULE(femml, m) {
         .def_readwrite("nodes", &BoundaryCondition::nodes)
         .def_readwrite("type", &BoundaryCondition::type)
         .def_readwrite("component", &BoundaryCondition::component)
-        .def_readwrite("value", &BoundaryCondition::value);
+        .def_readwrite("value", &BoundaryCondition::value)
+        .def_readwrite("ramp_time", &BoundaryCondition::ramp_time);
 
     py::class_<Load>(m, "Load")
         .def(py::init<>())

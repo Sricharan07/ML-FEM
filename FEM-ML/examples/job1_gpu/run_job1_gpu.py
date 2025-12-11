@@ -18,6 +18,7 @@ import os
 import time
 import textwrap
 from pathlib import Path
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -43,20 +44,54 @@ try:
 except ImportError:
     print("=" * 70)
     print("ERROR: femml module not found!")
-    print("Please build the project with GPU support first:")
+    print("Please build the project first:")
     print("  cd FEM-ML")
     print("  .\\build.ps1")
     print("=" * 70)
     sys.exit(1)
 
-# Check if GPU solver is available
-if not hasattr(femml, 'GPUExplicitSolver'):
+HAS_GPU_SOLVER = hasattr(femml, 'GPUExplicitSolver')
+
+parser = argparse.ArgumentParser(description="Job-1 simulation (CPU or GPU backend)")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu"],
+    default="gpu",
+    help="Solver backend to use (default: gpu, falls back to cpu if unavailable)."
+)
+parser.add_argument(
+    "--gpu-id",
+    type=int,
+    default=0,
+    help="CUDA device ID to use when running on GPU."
+)
+parser.add_argument(
+    "--bc-mode",
+    choices=["load", "displacement"],
+    default="displacement",
+    help="Right-end boundary condition: nodal load or prescribed displacement (default)."
+)
+parser.add_argument(
+    "--displacement",
+    type=float,
+    default=7.5e-4,
+    help="Prescribed displacement (meters) when using displacement BC."
+)
+parser.add_argument(
+    "--ramp-time",
+    type=float,
+    default=0.3,
+    help="Ramp time (seconds) for prescribed displacement."
+)
+args = parser.parse_args()
+
+use_gpu = (args.device == "gpu")
+if use_gpu and not HAS_GPU_SOLVER:
     print("=" * 70)
-    print("ERROR: GPU solver not available!")
-    print("Please rebuild with CUDA support:")
-    print("  cmake -DFEMML_USE_GPU=ON ..")
+    print("WARNING: GPU solver not available in this build. Falling back to CPU solver.")
+    print("Rebuild with CUDA support (cmake -DFEMML_USE_GPU=ON ..) to enable GPU acceleration.")
     print("=" * 70)
-    sys.exit(1)
+    use_gpu = False
 
 try:
     import pyvista as pv
@@ -233,8 +268,9 @@ def save_snapshot_images(grid, snapshots, output_dir):
 
 
 def main():
+    backend_label = "GPU" if use_gpu else "CPU"
     print("=" * 70)
-    print("  FEM-ML GPU: Job-1 Simulation")
+    print(f"  FEM-ML {backend_label}: Job-1 Simulation")
     print("=" * 70)
 
     # ========================================================================
@@ -294,20 +330,22 @@ def main():
     print(f"   ✓ Density: {material.get_density():.1f} kg/m³")
 
     # ========================================================================
-    # 3. Create GPU Solver
+    # 3. Create Solver
     # ========================================================================
-    print("\n[3/7] Initializing GPU solver...")
-    solver = femml.GPUExplicitSolver(mesh)
+    print(f"\n[3/7] Initializing {backend_label} solver...")
+    if use_gpu:
+        solver = femml.GPUExplicitSolver(mesh)
+        solver.set_device_id(args.gpu_id)
+        print(f"   ✓ Using GPU device: {solver.get_device_id()}")
+    else:
+        solver = femml.ExplicitSolver(mesh)
+        print("   ✓ Using CPU solver")
     solver.set_material(material)
-
-    # Set GPU device (use device 0 by default)
-    solver.set_device_id(0)
-    print(f"   ✓ Using GPU device: {solver.get_device_id()}")
 
     # ========================================================================
     # 4. Apply Boundary Conditions
     # ========================================================================
-    print("\n[4/7] Setting boundary conditions...")
+    print(f"\n[4/7] Setting boundary conditions (mode: {args.bc_mode})...")
 
     # Fix left end nodes (assume nodes 1-100 are on left boundary)
     # In a real scenario, you would identify these from the mesh
@@ -318,21 +356,31 @@ def main():
     solver.add_boundary_condition(bc)
     print(f"   ✓ Fixed {len(bc.nodes)} nodes on left boundary (x ≈ {x_min:.3f})")
 
-    # ========================================================================
-    # 5. Apply Loads
-    # ========================================================================
-    print("\n[5/7] Applying loads...")
+    if args.bc_mode == "displacement":
+        disp_bc = femml.BoundaryCondition()
+        disp_bc.type = femml.BCType.DISPLACEMENT
+        disp_bc.nodes = right_nodes
+        disp_bc.component = 0  # X direction
+        disp_bc.value = args.displacement
+        disp_bc.ramp_time = args.ramp_time
+        solver.add_boundary_condition(disp_bc)
+        print(f"   ✓ Prescribed {args.displacement*1e3:.3f} mm displacement on {len(right_nodes)} right-edge nodes "
+              f"(ramp {args.ramp_time:.2f} s)")
+    else:
+        print("\n[5/7] Applying loads...")
+        force_magnitude = 1e6  # 1 MN
+        load = femml.Load()
+        load.type = femml.LoadType.FORCE
+        load.nodes = right_nodes
+        load.component = 0  # X direction (tensile)
+        load.value = force_magnitude / len(load.nodes)  # Distribute load
+        solver.add_load(load)
+        print(f"   ✓ Applied {force_magnitude:.2e} N tensile load")
+        print(f"   ✓ Distributed over {len(load.nodes)} nodes on right boundary (x ≈ {x_max:.3f})")
 
-    # Apply tensile load on right end nodes (last 100 nodes)
-    force_magnitude = 1e6  # 1 MN
-    load = femml.Load()
-    load.type = femml.LoadType.FORCE
-    load.nodes = right_nodes
-    load.component = 0  # X direction (tensile)
-    load.value = force_magnitude / len(load.nodes)  # Distribute load
-    solver.add_load(load)
-    print(f"   ✓ Applied {force_magnitude:.2e} N tensile load")
-    print(f"   ✓ Distributed over {len(load.nodes)} nodes on right boundary (x ≈ {x_max:.3f})")
+    if args.bc_mode == "displacement":
+        print("\n[5/7] Applying loads...")
+        print("   ✓ No external loads (displacement-driven test)")
 
     # ========================================================================
     # 6. Configure Solver Parameters
@@ -406,7 +454,7 @@ def main():
     # ========================================================================
     # 7. Run Simulation
     # ========================================================================
-    print("\n[7/7] Running GPU simulation...")
+    print(f"\n[7/7] Running {backend_label} simulation...")
     print("   " + "-" * 60)
 
     # Progress callback
@@ -432,7 +480,8 @@ def main():
     solver.initialize()
     init_time = time.time() - init_start
     print(f"   ✓ Initialization time: {init_time:.2f} s")
-    print(f"   ✓ GPU memory usage: {solver.get_gpu_memory_usage() / (1024**2):.1f} MB")
+    if use_gpu and hasattr(solver, "get_gpu_memory_usage"):
+        print(f"   ✓ GPU memory usage: {solver.get_gpu_memory_usage() / (1024**2):.1f} MB")
     print()
     if capture_snapshots:
         capture_snapshot(0, 0.0)
@@ -448,8 +497,10 @@ def main():
     print("   " + "-" * 60)
     print(f"   ✓ Simulation complete!")
     print(f"   ✓ Total solve time: {solve_time:.2f} s")
-    print(f"   ✓ GPU compute time: {solver.get_gpu_compute_time():.2f} s")
-    print(f"   ✓ CPU-GPU transfer time: {solver.get_cpu_gpu_transfer_time():.2f} s")
+    if use_gpu and hasattr(solver, "get_gpu_compute_time"):
+        print(f"   ✓ GPU compute time: {solver.get_gpu_compute_time():.2f} s")
+    if use_gpu and hasattr(solver, "get_cpu_gpu_transfer_time"):
+        print(f"   ✓ CPU-GPU transfer time: {solver.get_cpu_gpu_transfer_time():.2f} s")
     print(f"   ✓ Performance: {params.num_steps / solve_time:.1f} steps/s")
 
     # ========================================================================
@@ -535,7 +586,9 @@ def main():
     print(f"  Total time: {total_time} s ({params.num_steps:,} steps)")
     print(f"  Time step per increment: {params.time_step:.6e} s")
     print(f"  Solve time: {solve_time:.2f} s ({params.num_steps / solve_time:.1f} steps/s)")
-    print(f"  GPU speedup: {solve_time / solver.get_gpu_compute_time():.1f}x")
+    print(f"  Boundary condition mode: {args.bc_mode}")
+    if use_gpu and hasattr(solver, "get_gpu_compute_time"):
+        print(f"  GPU speedup: {solve_time / solver.get_gpu_compute_time():.1f}x")
     print(f"  Max displacement: {np.max(disp_mag) * 1000:.4f} mm")
     if contour_summary:
         print("  Contour outputs:")
@@ -547,7 +600,7 @@ def main():
             for gif in gif_paths:
                 print(f"      GIF: {gif}")
     print("=" * 70)
-    print("\n✓ Job-1 GPU simulation complete!\n")
+    print(f"\n✓ Job-1 {backend_label} simulation complete!\n")
 
 
 if __name__ == "__main__":

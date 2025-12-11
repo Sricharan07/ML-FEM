@@ -14,6 +14,13 @@
 using namespace femml;
 
 // Simple configuration file parser
+struct DisplacementSpec {
+    int node = 0;
+    int component = 0;
+    double value = 0.0;
+    double ramp_time = 0.0;
+};
+
 struct Config {
     std::string mesh_file;
     std::string material_name = "aluminum";
@@ -28,6 +35,7 @@ struct Config {
     std::string output_file = "results.csv";
     std::vector<int> fixed_nodes;
     std::vector<std::tuple<int, int, double>> loads;  // node, component, value
+    std::vector<DisplacementSpec> displacements;
 };
 
 Config ParseConfig(const std::string& filename) {
@@ -86,6 +94,11 @@ Config ParseConfig(const std::string& filename) {
             while (iss >> node) {
                 config.fixed_nodes.push_back(node);
             }
+        }
+        else if (key == "displacement") {
+            DisplacementSpec spec;
+            iss >> spec.node >> spec.component >> spec.value >> spec.ramp_time;
+            config.displacements.push_back(spec);
         }
         else if (key == "force") {
             int node, comp;
@@ -160,6 +173,20 @@ int main(int argc, char** argv) {
             bc.value = 0.0;
             solver.AddBoundaryCondition(bc);
             std::cout << "\nFixed nodes: " << config.fixed_nodes.size() << std::endl;
+        }
+
+        for (const auto& disp_spec : config.displacements) {
+            BoundaryCondition bc;
+            bc.type = BCType::DISPLACEMENT;
+            bc.nodes = {disp_spec.node};
+            bc.component = disp_spec.component;
+            bc.value = disp_spec.value;
+            bc.ramp_time = disp_spec.ramp_time;
+            solver.AddBoundaryCondition(bc);
+            std::cout << "Displacement BC: Node " << disp_spec.node
+                      << ", component " << disp_spec.component
+                      << ", value " << disp_spec.value
+                      << " m over " << disp_spec.ramp_time << " s" << std::endl;
         }
 
         // Add loads

@@ -1,0 +1,10 @@
+^D:\RESEARCH-WORK\ML-FEM\FEM-ML\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/Research-work/ML-FEM/FEM-ML -BD:/Research-work/ML-FEM/FEM-ML/build --check-stamp-file D:/Research-work/ML-FEM/FEM-ML/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

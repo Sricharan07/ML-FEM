@@ -33,6 +33,13 @@ struct BoundaryCondition {
     BCType type;
     int component;  // 0=x, 1=y, 2=z, -1=all
     double value;
+    double ramp_time; // Time to ramp to target displacement (for DISPLACEMENT BCs)
+
+    BoundaryCondition()
+        : type(BCType::FIXED),
+          component(-1),
+          value(0.0),
+          ramp_time(0.0) {}
 };
 
 // Load definition

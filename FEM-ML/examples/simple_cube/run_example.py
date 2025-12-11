@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""
-Simple example demonstrating FEM-ML Python API
-"""
+"""Simple cube tension test with prescribed displacement boundary conditions."""
 
-import sys
+import math
 import os
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 _HERE = os.path.abspath(os.path.dirname(__file__))
 _ROOT = os.path.abspath(os.path.join(_HERE, "../../"))
@@ -19,105 +21,118 @@ for _path in _PYTHON_CANDIDATES:
         sys.path.insert(0, _path)
 
 try:
-    import femml
+    import femml  # type: ignore
 except ImportError:
     print("Error: femml module not found. Please build the project first.")
     sys.exit(1)
 
-import numpy as np
-import matplotlib.pyplot as plt
 
-
-def main():
+def main() -> None:
     print("=" * 60)
     print("FEM-ML Simple Cube Example")
     print("=" * 60)
 
-    # Import mesh
     print("\n1. Importing mesh...")
     importer = femml.AbaqusImporter()
     cube_path = os.path.join(_HERE, "cube.inp")
     mesh = importer.import_mesh(cube_path)
 
-    # Create material
     print("\n2. Creating material...")
     material = femml.create_aluminum()
     print(f"   Material: {material.get_name()}")
-    print(f"   Density: {material.get_density()} kg/m³")
+    print(f"   Density: {material.get_density()} kg/m^3")
 
-    # Create solver
     print("\n3. Setting up solver...")
     solver = femml.ExplicitSolver(mesh)
-
-    # Assign material
     solver.set_material(material)
 
-    # Add boundary conditions (fix bottom face)
-    bc = femml.BoundaryCondition()
-    bc.type = femml.BCType.FIXED
-    bc.nodes = [1, 2, 5, 6]
-    bc.component = -1  # All components
-    solver.add_boundary_condition(bc)
+    left_nodes = [1, 4, 7, 10, 13, 16]   # x = 0 mm plane
+    right_nodes = [3, 6, 9, 12, 15, 18]  # x = 1 mm plane
+    target_disp = 5.43e-6  # 0.00543 mm
+    ramp_time = 0.002      # seconds
+    disp_rate = target_disp / ramp_time
 
-    # Add load (pull top face in Y direction)
-    for node_id in [3, 4, 7, 8]:
-        load = femml.Load()
-        load.type = femml.LoadType.FORCE
-        load.nodes = [node_id]
-        load.component = 1  # Y direction
-        load.value = 5e5  # 500 kN
-        solver.add_load(load)
+    # Clamp the left end in all directions
+    left_bc = femml.BoundaryCondition()
+    left_bc.type = femml.BCType.FIXED
+    left_bc.nodes = left_nodes
+    left_bc.component = -1
+    solver.add_boundary_condition(left_bc)
 
-    # Set solver parameters
+    # Prescribed X-displacement on the right end
+    right_bc = femml.BoundaryCondition()
+    right_bc.type = femml.BCType.DISPLACEMENT
+    right_bc.nodes = right_nodes
+    right_bc.component = 0  # X direction
+    right_bc.value = target_disp
+    right_bc.ramp_time = ramp_time
+    solver.add_boundary_condition(right_bc)
+
+    print("   Boundary conditions:")
+    print(f"     - Left nodes fixed (IDs {left_nodes})")
+    print(
+        "     - Right nodes reach "
+        f"{target_disp * 1e3:.5f} mm in {ramp_time * 1e3:.1f} ms "
+        f"({disp_rate * 1e3:.2f} mm/s)"
+    )
+
+    # Time stepping (2 ms total, 0.5 µs step => 4000 steps)
+    total_time = ramp_time
+    time_step = 5e-7
+    num_steps = int(math.ceil(total_time / time_step))
+
     params = femml.SolverParams()
-    params.time_step = 5e-8
-    params.num_steps = 2000
+    params.time_step = time_step
+    params.num_steps = num_steps
     params.damping = 0.0
-    params.output_interval = 50
-    params.auto_time_step = True
+    params.output_interval = max(1, num_steps // 20)
+    params.auto_time_step = False
     solver.set_parameters(params)
 
-    # Initialize solver
     print("\n4. Initializing solver...")
     solver.initialize()
 
-    # Track displacement history
     time_history = []
     disp_history = []
 
-    def output_callback(step, time):
-        # Track node 8 displacement
-        disp = solver.get_node_displacement(8)
-        time_history.append(time)
-        disp_history.append(disp[1])  # Y displacement
+    def output_callback(step: int, sim_time: float) -> None:
+        if step == 0:
+            return
+        avg_disp = np.mean([solver.get_node_displacement(n)[0] for n in right_nodes])
+        time_history.append(sim_time)
+        disp_history.append(avg_disp)
 
     solver.set_output_callback(output_callback)
 
-    # Solve
     print("\n5. Running analysis...")
     solver.solve()
 
-    # Write results
     print("\n6. Writing results...")
-    solver.write_results("results.csv")
+    results_file = "simple_cube_results.csv"
+    solver.write_results(results_file)
+    print(f"   Saved nodal results -> {results_file}")
 
-    # Plot displacement history
     print("\n7. Plotting results...")
-    plt.figure(figsize=(10, 6))
-    plt.plot(np.array(time_history) * 1e6, np.array(disp_history) * 1e3)
-    plt.xlabel("Time (μs)")
-    plt.ylabel("Y Displacement (mm)")
-    plt.title("Node 8 Displacement History")
-    plt.grid(True)
+    time_ms = np.array(time_history) * 1e3
+    disp_mm = np.array(disp_history) * 1e3
+    plt.figure(figsize=(8, 5))
+    plt.plot(time_ms, disp_mm, lw=2.0, color="navy")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Average X Displacement (mm)")
+    plt.title("Right Face Prescribed Displacement History")
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
     plt.savefig("displacement_history.png", dpi=150)
     print("   Saved plot: displacement_history.png")
 
-    # Print final displacements
-    print("\n8. Final displacements:")
-    for node_id in [1, 2, 3, 4, 5, 6, 7, 8]:
-        disp = solver.get_node_displacement(node_id)
-        print(f"   Node {node_id}: "
-              f"({disp[0]*1e3:.4f}, {disp[1]*1e3:.4f}, {disp[2]*1e3:.4f}) mm")
+    print("\n8. Final X-displacements (mm):")
+    for label, nodes in [
+        ("Left (fixed)", left_nodes),
+        ("Right (loaded)", right_nodes),
+    ]:
+        values = [solver.get_node_displacement(n)[0] * 1e3 for n in nodes]
+        formatted = ", ".join(f"Node {nid}: {val:.5f}" for nid, val in zip(nodes, values))
+        print(f"   {label}: {formatted}")
 
     print("\n" + "=" * 60)
     print("Analysis complete!")

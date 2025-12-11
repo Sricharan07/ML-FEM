@@ -3,6 +3,8 @@
 #include "material/LinearElastic.hpp"
 #include "solver/ExplicitSolver.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 
 using namespace femml;
@@ -28,29 +30,33 @@ int main() {
         ExplicitSolver solver(mesh);
         solver.SetMaterial(material);
 
-        // Boundary conditions (fix bottom)
+        // Boundary conditions
+        const std::vector<int> left_nodes = {1, 4, 7, 10, 13, 16};
+        const std::vector<int> right_nodes = {3, 6, 9, 12, 15, 18};
+        const double target_disp = 5.43e-6;  // meters
+        const double ramp_time = 0.002;      // seconds
+
         BoundaryCondition bc;
         bc.type = BCType::FIXED;
-        bc.nodes = {1, 2, 5, 6};
+        bc.nodes = left_nodes;
         bc.component = -1;
         solver.AddBoundaryCondition(bc);
 
-        // Load (pull top)
-        for (int node : {3, 4, 7, 8}) {
-            Load load;
-            load.type = LoadType::FORCE;
-            load.nodes = {node};
-            load.component = 1;  // Y
-            load.value = 5e5;
-            solver.AddLoad(load);
-        }
+        BoundaryCondition disp_bc;
+        disp_bc.type = BCType::DISPLACEMENT;
+        disp_bc.nodes = right_nodes;
+        disp_bc.component = 0;  // X direction
+        disp_bc.value = target_disp;
+        disp_bc.ramp_time = ramp_time;
+        solver.AddBoundaryCondition(disp_bc);
 
-        // Parameters
+        // Parameters (2 ms total, 0.5 us time step)
         SolverParams params;
-        params.time_step = 5e-8;
-        params.num_steps = 2000;
-        params.output_interval = 50;
-        params.auto_time_step = true;
+        params.time_step = 5e-7;
+        params.num_steps = static_cast<int>(std::ceil(ramp_time / params.time_step));
+        params.output_interval = std::max(1, params.num_steps / 20);
+        params.damping = 0.0;
+        params.auto_time_step = false;
         solver.SetParameters(params);
 
         // Initialize and solve

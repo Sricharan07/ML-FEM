@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>D:\Research-work\ML-FEM\FEM-ML\build\x64\Release\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Research-work\ML-FEM\FEM-ML\build\examples\Release\example_cube.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Research-work\ML-FEM\FEM-ML\build\src\python\Release\femml.cp311-win_amd64.pyd</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Research-work\ML-FEM\FEM-ML\build\src\core\Release\femml_solver.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Research-work\ML-FEM\FEM-ML\build\x64\Release\ALL_BUILD</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

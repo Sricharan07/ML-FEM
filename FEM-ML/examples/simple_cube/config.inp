@@ -1,5 +1,5 @@
 # FEM-ML configuration file
-# Simple cube under tension
+# Simple cube (1mm^3) with prescribed X displacement on right face
 
 # Mesh file
 mesh ../examples/simple_cube/cube.inp
@@ -10,21 +10,24 @@ E 70e9
 nu 0.33
 rho 2700
 
-# Time integration
-dt 5e-8
-steps 2000
-auto_timestep true
+# Time integration (2 ms total, 0.5 us step)
+dt 5e-7
+steps 4000
+auto_timestep false
 damping 0.0
 
 # Output
 output_interval 50
 output results.csv
 
-# Boundary conditions (fix bottom nodes)
-fixed 1 2 5 6
+# Boundary conditions (fix left face x=0)
+fixed 1 4 7 10 13 16
 
-# Loads (pull top in Y direction)
-force 3 1 5e5
-force 4 1 5e5
-force 7 1 5e5
-force 8 1 5e5
+# Prescribed displacement on right face (x=1 mm)
+# Format: displacement NODE COMPONENT VALUE(m) RAMP_TIME(s)
+displacement 3 0 5.43e-6 0.002
+displacement 6 0 5.43e-6 0.002
+displacement 9 0 5.43e-6 0.002
+displacement 12 0 5.43e-6 0.002
+displacement 15 0 5.43e-6 0.002
+displacement 18 0 5.43e-6 0.002

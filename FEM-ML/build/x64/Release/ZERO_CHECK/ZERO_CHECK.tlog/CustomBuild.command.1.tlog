@@ -1,0 +1,10 @@
+^D:\RESEARCH-WORK\ML-FEM\FEM-ML\BUILD\CMAKEFILES\912E7D1A75F115B4A956E59543216069\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/Research-work/ML-FEM/FEM-ML -BD:/Research-work/ML-FEM/FEM-ML/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/Research-work/ML-FEM/FEM-ML/build/FEM-ML.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

@@ -1,0 +1,10 @@
+D:/Research-work/ML-FEM/FEM-ML/build/CMakeFiles/INSTALL.dir
+D:/Research-work/ML-FEM/FEM-ML/build/CMakeFiles/ALL_BUILD.dir
+D:/Research-work/ML-FEM/FEM-ML/build/CMakeFiles/ZERO_CHECK.dir
+D:/Research-work/ML-FEM/FEM-ML/build/src/core/CMakeFiles/femml_core.dir
+D:/Research-work/ML-FEM/FEM-ML/build/src/core/CMakeFiles/femml_solver.dir
+D:/Research-work/ML-FEM/FEM-ML/build/src/core/CMakeFiles/INSTALL.dir
+D:/Research-work/ML-FEM/FEM-ML/build/src/python/CMakeFiles/femml.dir
+D:/Research-work/ML-FEM/FEM-ML/build/src/python/CMakeFiles/INSTALL.dir
+D:/Research-work/ML-FEM/FEM-ML/build/examples/CMakeFiles/example_cube.dir
+D:/Research-work/ML-FEM/FEM-ML/build/examples/CMakeFiles/INSTALL.dir

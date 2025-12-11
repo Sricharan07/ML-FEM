@@ -188,18 +188,20 @@ void ExplicitSolver::Solve() {
     std::cout << "Total time: " << params_.num_steps * params_.time_step << " s" << std::endl;
     std::cout << "============================================\n" << std::endl;
 
-    for (current_step_ = 0; current_step_ < params_.num_steps; ++current_step_) {
+    current_step_ = 0;
+    while (current_step_ < params_.num_steps) {
+        int step_index = current_step_;
         Step();
 
         // Progress output
-        if (current_step_ % params_.output_interval == 0) {
-            double progress = 100.0 * current_step_ / params_.num_steps;
-            std::cout << "Step " << current_step_ << " / " << params_.num_steps
+        if (step_index % params_.output_interval == 0) {
+            double progress = 100.0 * step_index / params_.num_steps;
+            std::cout << "Step " << step_index << " / " << params_.num_steps
                       << " (" << std::fixed << std::setprecision(1) << progress << "%)"
                       << " Time: " << std::scientific << current_time_ << " s" << std::endl;
 
             if (output_callback_) {
-                output_callback_(current_step_, current_time_);
+                output_callback_(step_index, current_time_);
             }
         }
     }
@@ -208,6 +210,10 @@ void ExplicitSolver::Solve() {
 }
 
 void ExplicitSolver::Step() {
+    if (current_step_ >= params_.num_steps) {
+        return;
+    }
+
     // 1. Compute internal forces
     ComputeInternalForces();
 
@@ -222,6 +228,7 @@ void ExplicitSolver::Step() {
 
     // 5. Update time
     current_time_ += params_.time_step;
+    current_step_++;
 }
 
 void ExplicitSolver::ComputeInternalForces() {
@@ -338,7 +345,38 @@ void ExplicitSolver::ApplyBoundaryConditions() {
                 }
             }
         }
-        // TODO: Implement other BC types
+        else if (bc.type == BCType::DISPLACEMENT) {
+            double ramp = std::max(0.0, bc.ramp_time);
+            double target = bc.value;
+            double scale = 1.0;
+            double velocity = 0.0;
+
+            if (ramp > 0.0) {
+                scale = std::min(1.0, current_time_ / ramp);
+                velocity = (current_time_ < ramp) ? target / ramp : 0.0;
+            }
+
+            double applied_disp = target * scale;
+
+            for (int node_id : bc.nodes) {
+                int idx = node_to_index_[node_id];
+
+                auto apply_component = [&](int comp) {
+                    displacements_[idx][comp] = applied_disp;
+                    velocities_[idx][comp] = velocity;
+                    accelerations_[idx][comp] = 0.0;
+                };
+
+                if (bc.component == -1) {
+                    apply_component(0);
+                    apply_component(1);
+                    apply_component(2);
+                }
+                else if (bc.component >= 0 && bc.component < 3) {
+                    apply_component(bc.component);
+                }
+            }
+        }
     }
 }
 

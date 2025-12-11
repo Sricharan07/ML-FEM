@@ -22,6 +22,7 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QAbstractTableModel, QModelInde
 from PyQt5.QtGui import QIcon, QFont, QColor
 
 import math
+import re
 import numpy as np
 
 # ----------------------------------------------------------------------
@@ -747,6 +748,7 @@ class Viewer3D(QWidget if not HAS_PYVISTA else QtInteractor):
             self.mesh_actor = None
             self.mesh_data = None
             self.base_points = None
+            self._text_actor = None
         else:
             # Fallback UI
             layout = QVBoxLayout()
@@ -754,6 +756,58 @@ class Viewer3D(QWidget if not HAS_PYVISTA else QtInteractor):
             label.setAlignment(Qt.AlignCenter)
             layout.addWidget(label)
             self.setLayout(layout)
+
+    def _remove_mesh_actor(self, actor=None):
+        """Remove a mesh actor without clearing the entire scene."""
+        if not HAS_PYVISTA:
+            return
+        target = actor if actor is not None else self.mesh_actor
+        if target is None:
+            return
+        try:
+            self.remove_actor(target, reset_camera=False, render=False)
+        except Exception:
+            try:
+                self.renderer.RemoveActor(target)
+            except Exception:
+                pass
+        if actor is None or target is self.mesh_actor:
+            if target is self.mesh_actor:
+                self.mesh_actor = None
+
+    def _update_title_text(self, title: str = ""):
+        """Refresh the scalar-bar title text actor."""
+        if not HAS_PYVISTA:
+            return
+        if self._text_actor is not None:
+            try:
+                self.remove_actor(self._text_actor, reset_camera=False, render=False)
+            except Exception:
+                try:
+                    self.renderer.RemoveActor2D(self._text_actor)
+                except Exception:
+                    pass
+            self._text_actor = None
+        if title:
+            try:
+                self._text_actor = self.add_text(title, font_size=10, name="_field_title")
+            except Exception:
+                self._text_actor = None
+
+    def _replace_mesh_actor(self, frame, plot_kwargs, title=""):
+        """Add a new mesh actor and remove the previous one only after success."""
+        if not HAS_PYVISTA:
+            return False
+        old_actor = self.mesh_actor
+        try:
+            new_actor = self.add_mesh(frame, **plot_kwargs)
+        except Exception:
+            return False
+        self.mesh_actor = new_actor
+        self._update_title_text(title)
+        if old_actor is not None:
+            self._remove_mesh_actor(old_actor)
+        return True
 
     def load_mesh(self, nodes, elements):
         """Load mesh for visualization"""
@@ -789,14 +843,14 @@ class Viewer3D(QWidget if not HAS_PYVISTA else QtInteractor):
         self.mesh_data = pv.UnstructuredGrid(cells_array, cell_types_array, points)
         self.base_points = self.mesh_data.points.copy()
 
-        self.clear()
-        self.mesh_actor = self.add_mesh(
-            self.mesh_data,
-            show_edges=True,
-            color='lightblue',
-            opacity=0.9,
-            edge_color='black'
-        )
+        plot_kwargs = {
+            'show_edges': True,
+            'color': 'lightblue',
+            'opacity': 0.9,
+            'edge_color': 'black'
+        }
+        if not self._replace_mesh_actor(self.mesh_data, plot_kwargs, title=""):
+            raise RuntimeError("Failed to initialize PyVista mesh actor")
 
         self.reset_camera()
         self.update()
@@ -848,11 +902,8 @@ class Viewer3D(QWidget if not HAS_PYVISTA else QtInteractor):
                 'show_scalar_bar': False,
             })
 
-        self.clear()
-        self.mesh_actor = self.add_mesh(frame, **plot_kwargs)
-        if title:
-            self.add_text(title, font_size=10)
-        self.update()
+        if self._replace_mesh_actor(frame, plot_kwargs, title=title):
+            self.update()
 
     def update_displacements(self, displacements, scale=1000.0):
         disp_mag = np.linalg.norm([[d[0], d[1], d[2]] for d in displacements], axis=1)
@@ -902,6 +953,10 @@ class MainWindow(QMainWindow):
         self.last_displacements = None
         self.last_stress_components = None
         self.last_vm = None
+        self.enable_live_view = True
+        self.export_frames = False
+        self.frame_export_interval = 50
+        self._frame_export_warned = False
 
         self.setup_ui()
         self.create_menus()
@@ -1093,6 +1148,25 @@ class MainWindow(QMainWindow):
         self.field_combo.setCurrentText(self.display_field)
         self.field_combo.currentTextChanged.connect(self.on_field_changed)
         toolbar.addWidget(self.field_combo)
+
+        self.live_view_checkbox = QCheckBox("Live View")
+        self.live_view_checkbox.setChecked(self.enable_live_view)
+        self.live_view_checkbox.toggled.connect(self.on_live_view_toggled)
+        toolbar.addWidget(self.live_view_checkbox)
+
+        self.frame_export_checkbox = QCheckBox("Export Frames")
+        self.frame_export_checkbox.setChecked(self.export_frames)
+        self.frame_export_checkbox.toggled.connect(self.on_frame_export_toggled)
+        toolbar.addWidget(self.frame_export_checkbox)
+
+        self.frame_interval_spin = QSpinBox()
+        self.frame_interval_spin.setRange(1, 1000)
+        self.frame_interval_spin.setValue(self.frame_export_interval)
+        self.frame_interval_spin.setEnabled(self.export_frames)
+        self.frame_interval_spin.valueChanged.connect(self.on_frame_interval_changed)
+        toolbar.addWidget(QLabel(" every "))
+        toolbar.addWidget(self.frame_interval_spin)
+        toolbar.addWidget(QLabel(" steps"))
 
     def create_status_bar(self):
         self.status_bar = QStatusBar()
@@ -1469,7 +1543,10 @@ class MainWindow(QMainWindow):
             else:
                 self.last_stress_components = None
                 self.last_vm = None
-            self.update_visualization_from_cache()
+            if self.export_frames:
+                self.export_frame_snapshot(step, time)
+            if self.enable_live_view:
+                self.update_visualization_from_cache()
 
             self.update_results_views()
             self.auto_export_plots()
@@ -1487,7 +1564,7 @@ class MainWindow(QMainWindow):
         te = self.solver.get_total_energy()
         self.job_monitor.update_status(step, self.total_steps, time, ke, se, te)
 
-        # Update visualization every 10 steps
+        # Update visualization/export every 10 steps
         if step % 10 == 0:
             disps = self.solver.get_displacements()
             self.last_displacements = disps
@@ -1498,7 +1575,16 @@ class MainWindow(QMainWindow):
             else:
                 self.last_stress_components = None
                 self.last_vm = None
-            self.update_visualization_from_cache()
+
+            if (
+                self.export_frames
+                and self.frame_export_interval > 0
+                and step % self.frame_export_interval == 0
+            ):
+                self.export_frame_snapshot(step, time)
+
+            if self.enable_live_view:
+                self.update_visualization_from_cache()
 
         # Schedule next step
         QTimer.singleShot(1, self.run_solver_step)
@@ -1668,6 +1754,46 @@ class MainWindow(QMainWindow):
         plt.close(fig)
         return True
 
+    def export_frame_snapshot(self, step: int, current_time: float) -> None:
+        """Export a 2D scatter snapshot for the active field at a given time step."""
+        if not self.export_frames or not HAS_MATPLOTLIB:
+            return
+        if self.mesh_coords_np is None or self.last_displacements is None:
+            return
+        scalars, title, cmap = self._resolve_field_scalars(self.display_field)
+        if scalars is None:
+            return
+        coords = np.asarray(self.mesh_coords_np, dtype=float)
+        if coords.shape[0] != scalars.shape[0]:
+            return
+
+        field_label = title or self.display_field
+        slug = self._field_slug(field_label)
+        export_dir = Path(_root_dir) / "exports" / "frames" / slug
+        export_dir.mkdir(parents=True, exist_ok=True)
+        filename = export_dir / f"{slug}_step{step:05d}_t{current_time:.5f}s.png"
+
+        from matplotlib import pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(9, 2.5))
+        sc = ax.scatter(
+            coords[:, 0],
+            coords[:, 1],
+            c=scalars,
+            cmap=cmap,
+            s=18,
+            edgecolors="none",
+        )
+        ax.set_title(f"{field_label}  t = {current_time:.4f} s")
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_aspect("equal", "box")
+        fig.colorbar(sc, ax=ax, fraction=0.046)
+        fig.tight_layout()
+        fig.savefig(str(filename), dpi=220)
+        plt.close(fig)
+        self.status_bar.showMessage(f"Frame exported: {filename.name}")
+
     def _von_mises(self, stress_vec):
         sxx, syy, szz, sxy, sxz, syz = self._sanitize_array(stress_vec)
         return math.sqrt(
@@ -1693,6 +1819,10 @@ class MainWindow(QMainWindow):
         arr = np.nan_to_num(arr, nan=0.0, posinf=limit, neginf=-limit)
         np.clip(arr, -limit, limit, out=arr)
         return arr
+
+    def _field_slug(self, text: str) -> str:
+        slug = re.sub(r'[^0-9a-zA-Z]+', '-', text.lower()).strip('-')
+        return slug or "field"
 
     def _export_pyvista_snapshot(self, output_path: Path) -> bool:
         """Render a deformed stress view off-screen via PyVista."""
@@ -1827,7 +1957,7 @@ class MainWindow(QMainWindow):
     def update_visualization(self, displacements, stress_vm):
         if not HAS_PYVISTA or not hasattr(self.viewer, "update_field"):
             return
-            scalars = stress_vm if stress_vm is not None else None
+        scalars = stress_vm if stress_vm is not None else None
         if scalars is not None:
             scalars = self._sanitize_array(scalars)
         self.viewer.update_field(
@@ -1840,22 +1970,36 @@ class MainWindow(QMainWindow):
         )
 
     def update_visualization_from_cache(self):
+        if not self.enable_live_view:
+            return
         if self.last_displacements is None or len(self.last_displacements) == 0:
             return
-        field = self.display_field
+        scalars, title, cmap = self._resolve_field_scalars(self.display_field)
+        show_bar = self.show_scalar_bar and scalars is not None
+        self.viewer.update_field(
+            displacements=self.last_displacements,
+            scalars=scalars,
+            title=title,
+            scale=self.deformation_scale,
+            cmap=cmap,
+            show_scalar_bar=show_bar
+        )
+
+    def _resolve_field_scalars(self, field_name):
+        """Return (scalars, title, cmap) for the requested display field."""
+        scalars = None
         title = ""
         cmap = "inferno"
-        scalars = None
 
-        if field == "Von Mises Stress":
+        if field_name == "Von Mises Stress":
             scalars = self.last_vm if self.last_vm is not None else self.compute_nodal_von_mises()
             if scalars is not None:
                 self.last_vm = scalars
                 title = "Von Mises Stress (Pa)"
-        elif field == "Displacement Magnitude":
-            disp = np.array([[d[0], d[1], d[2]] for d in self.last_displacements])
+        elif field_name == "Displacement Magnitude":
+            disp = np.asarray(self.last_displacements, dtype=float)
             if disp.ndim == 2 and disp.shape[0] > 0:
-                scalars = np.linalg.norm(disp, axis=1)
+                scalars = np.linalg.norm(disp[:, :3], axis=1)
                 title = "Displacement Magnitude (m)"
                 cmap = "viridis"
         else:
@@ -1869,22 +2013,15 @@ class MainWindow(QMainWindow):
                     "Sxz": 4,
                     "Syz": 5,
                 }
-                idx = mapping.get(field)
+                idx = mapping.get(field_name)
                 if idx is not None:
                     scalars = comps[:, idx]
-                    title = f"{field} (Pa)"
+                    title = f"{field_name} (Pa)"
                     cmap = "plasma"
 
         if scalars is not None:
             scalars = self._sanitize_array(scalars)
-            self.viewer.update_field(
-                displacements=self.last_displacements,
-                scalars=scalars,
-                title=title,
-                scale=self.deformation_scale,
-                cmap=cmap,
-                show_scalar_bar=self.show_scalar_bar
-            )
+        return scalars, title, cmap
 
     def on_field_changed(self, text):
         self.display_field = text
@@ -1911,6 +2048,42 @@ class MainWindow(QMainWindow):
         """Toggle scalar-bar visibility."""
         self.show_scalar_bar = bool(checked)
         self.update_visualization_from_cache()
+
+    def on_live_view_toggled(self, checked):
+        """Enable/disable PyVista live updates."""
+        self.enable_live_view = bool(checked)
+        if self.enable_live_view:
+            self.update_visualization_from_cache()
+
+    def on_frame_export_toggled(self, checked):
+        """Enable/disable time-step frame exports."""
+        if checked and not HAS_MATPLOTLIB:
+            QMessageBox.warning(
+                self,
+                "Matplotlib Required",
+                "Install matplotlib to enable frame exports (pip install matplotlib).",
+            )
+            self.frame_export_checkbox.setChecked(False)
+            return
+        self.export_frames = bool(checked)
+        if hasattr(self, "frame_interval_spin"):
+            self.frame_interval_spin.setEnabled(self.export_frames)
+        if self.export_frames:
+            export_dir = Path(_root_dir) / "exports" / "frames"
+            export_dir.mkdir(parents=True, exist_ok=True)
+            self.status_bar.showMessage(
+                f"Frame export enabled (every {self.frame_export_interval} steps)"
+            )
+        else:
+            self.status_bar.showMessage("Frame export disabled")
+
+    def on_frame_interval_changed(self, value):
+        """Update frame export interval from toolbar control."""
+        self.frame_export_interval = max(1, int(value))
+        if self.export_frames:
+            self.status_bar.showMessage(
+                f"Frame export interval set to {self.frame_export_interval} steps"
+            )
 
     def show_howto(self):
         """Show how-to guide"""
